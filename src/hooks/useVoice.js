@@ -176,11 +176,6 @@ export function useVoice(activeWs) {
     const cameraTransceiver = pc.addTransceiver('video', { direction: cameraDir })
     cameraSendersRef.current.set(peerId, cameraTransceiver.sender)
 
-    // Adiciona transceiver de vídeo para screen share de forma dinâmica
-    const screenDir = localScreenStreamRef.current ? 'sendrecv' : 'recvonly'
-    const screenTransceiver = pc.addTransceiver('video', { direction: screenDir })
-    screenSendersRef.current.set(peerId, screenTransceiver.sender)
-
     // Se já estiver com a câmera ligada, envia a track atual
     if (localCameraStreamRef.current) {
       const videoTrack = localCameraStreamRef.current.getVideoTracks()[0]
@@ -189,11 +184,13 @@ export function useVoice(activeWs) {
       }
     }
 
-    // Se já estiver compartilhando tela, envia a track atual
+    // Se já estiver compartilhando tela quando este peer entrou,
+    // adiciona a track de screen share via addTrack (gera renegociação automática)
     if (localScreenStreamRef.current) {
-      const videoTrack = localScreenStreamRef.current.getVideoTracks()[0]
-      if (videoTrack) {
-        await screenTransceiver.sender.replaceTrack(videoTrack)
+      const screenTrack = localScreenStreamRef.current.getVideoTracks()[0]
+      if (screenTrack) {
+        const screenSender = pc.addTrack(screenTrack, localScreenStreamRef.current)
+        screenSendersRef.current.set(peerId, screenSender)
       }
     }
 
@@ -231,15 +228,13 @@ export function useVoice(activeWs) {
       if (track.kind === 'video') {
         const videoTransceivers = pc.getTransceivers().filter(t => t.receiver.track.kind === 'video')
         const idx = videoTransceivers.indexOf(event.transceiver)
-        const stream = event.streams[0] || new MediaStream([track])
 
         if (idx === 0) {
-          // É a Câmera!
+          // Câmera (transceiver pré-alocado, sempre primeiro)
+          const stream = event.streams[0] || new MediaStream([track])
           receivedWebcamStreamsRef.current.set(peerId, stream)
           const showCamera = () => {
-            if (track.readyState === 'live' && !track.muted) {
-              setWebcamStreams(prev => ({ ...prev, [peerId]: stream }))
-            }
+            setWebcamStreams(prev => ({ ...prev, [peerId]: stream }))
           }
           const removeCamera = () => {
             setWebcamStreams(prev => {
@@ -252,17 +247,15 @@ export function useVoice(activeWs) {
           track.onunmute = showCamera
           track.onended = removeCamera
           track.onmute = removeCamera
-          
           if (track.readyState === 'live' && !track.muted) {
             showCamera()
           }
-        } else if (idx === 1) {
-          // É o Screen Share!
-          receivedScreenSharesRef.current.set(peerId, stream)
+        } else {
+          // Screen Share (adicionada via addTrack — qualquer track de vídeo após a câmera)
+          // Com addTrack, event.streams[0] é o MediaStream real e ativo do transmissor
+          const stream = event.streams[0] || new MediaStream([track])
           const showShare = () => {
-            if (track.readyState === 'live' && !track.muted) {
-              setScreenShares(prev => ({ ...prev, [peerId]: stream }))
-            }
+            setScreenShares(prev => ({ ...prev, [peerId]: stream }))
           }
           const removeScreenShare = () => {
             setScreenShares(prev => {
@@ -275,7 +268,7 @@ export function useVoice(activeWs) {
           track.onunmute = showShare
           track.onended = removeScreenShare
           track.onmute = removeScreenShare
-          
+          // Com addTrack a track costuma já estar live ao chegar no receptor
           if (track.readyState === 'live' && !track.muted) {
             showShare()
           }
@@ -656,23 +649,20 @@ export function useVoice(activeWs) {
       const videoTrack = stream.getVideoTracks()[0]
       videoTrack.onended = () => stopScreenShare()
 
-      // Usa replaceTrack no transceiver de vídeo existente de cada peer
-      for (const [peerId, sender] of screenSendersRef.current) {
+      // Usa addTrack em vez de replaceTrack:
+      // addTrack dispara onnegotiationneeded automaticamente e garante que o
+      // receptor receba a track real via ontrack com a MediaStream ativa.
+      // replaceTrack+direction change é não confiável para o receptor ver o vídeo.
+      for (const [peerId, pc] of peerConnectionsRef.current) {
         try {
-          await sender.replaceTrack(videoTrack)
-          const pc = peerConnectionsRef.current.get(peerId)
-          if (pc) {
-            const transceiver = pc.getTransceivers().find(t => t.sender === sender)
-            if (transceiver && transceiver.direction !== 'sendrecv') {
-              transceiver.direction = 'sendrecv'
-            }
-          }
+          const sender = pc.addTrack(videoTrack, stream)
+          screenSendersRef.current.set(peerId, sender)
         } catch (err) {
           console.warn(`Erro ao enviar screen share para ${peerId.slice(0,8)}:`, err)
         }
       }
 
-      // Notifica via broadcast que estamos compartilhando tela (metadado)
+      // Notifica via broadcast (apenas metadado — badge AO VIVO)
       voiceRoomChanRef.current?.send({
         type: 'broadcast',
         event: 'voice_screen_state',
@@ -697,21 +687,19 @@ export function useVoice(activeWs) {
       return next
     })
 
-    // Remove a track de vídeo dos transceivers via replaceTrack(null)
-    for (const [peerId, sender] of screenSendersRef.current) {
-      try {
-        await sender.replaceTrack(null)
-        const pc = peerConnectionsRef.current.get(peerId)
-        if (pc) {
-          const transceiver = pc.getTransceivers().find(t => t.sender === sender)
-          if (transceiver && transceiver.direction !== 'recvonly') {
-            transceiver.direction = 'recvonly'
-          }
+    // removeTrack dispara onnegotiationneeded automaticamente,
+    // sinalizando ao receptor que a transmissão de tela terminou.
+    for (const [peerId, pc] of peerConnectionsRef.current) {
+      const sender = screenSendersRef.current.get(peerId)
+      if (sender) {
+        try {
+          pc.removeTrack(sender)
+        } catch (err) {
+          console.warn(`Erro ao remover screen share de ${peerId.slice(0,8)}:`, err)
         }
-      } catch (err) {
-        console.warn(`Erro ao remover screen share de ${peerId.slice(0,8)}:`, err)
       }
     }
+    screenSendersRef.current.clear()
 
     // Notifica via broadcast
     voiceRoomChanRef.current?.send({
@@ -854,28 +842,9 @@ export function useVoice(activeWs) {
         }
       })
       .on('broadcast', { event: 'voice_screen_state' }, ({ payload }) => {
-        const { peerId, isSharing: peerSharing } = payload
-        if (peerSharing) {
-          // Se já recebemos a track original via ontrack, usamos ela para forçar a montagem
-          const stream = receivedScreenSharesRef.current.get(peerId)
-          if (stream) {
-            setScreenShares(prev => ({ ...prev, [peerId]: stream }))
-          } else {
-            // Caso o broadcast chegue antes, usamos a track do transceiver
-            const pc = peerConnectionsRef.current.get(peerId)
-            if (pc) {
-              const videoTransceivers = pc.getTransceivers().filter(t => t.receiver.track.kind === 'video')
-              const screenTransceiver = videoTransceivers[1]
-              if (screenTransceiver && screenTransceiver.receiver.track) {
-                const fallback = new MediaStream([screenTransceiver.receiver.track])
-                setScreenShares(prev => {
-                  if (peerId in prev) return prev
-                  return { ...prev, [peerId]: fallback }
-                })
-              }
-            }
-          }
-        } else {
+        // O stream real chega via WebRTC ontrack (addTrack).
+        // Este broadcast serve apenas para remover o estado quando o peer para de compartilhar.
+        if (!payload.isSharing) {
           setScreenShares(prev => {
             if (!(payload.peerId in prev)) return prev
             const next = { ...prev }
