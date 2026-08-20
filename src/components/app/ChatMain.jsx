@@ -3,6 +3,7 @@ import { useAuth } from '../../context/AuthContext'
 import MessageList from './MessageList'
 import ScreenShareStrip from './ScreenShareStrip'
 import VideoGrid from './VideoGrid'
+import VoiceCallLayout from './VoiceCallLayout'
 
 export default function ChatMain({
   channel,
@@ -13,6 +14,8 @@ export default function ChatMain({
   webcamStreams,
   voiceUsers,
   inVoiceRoom,
+  showVoiceLayout,
+  onShowVoiceLayout,
   isMuted,
   isDeafened,
   isSharingScreen,
@@ -34,6 +37,29 @@ export default function ChatMain({
       streamRef.current.scrollTop = streamRef.current.scrollHeight
     }
   }, [messages])
+
+  if (inVoiceRoom && showVoiceLayout) {
+    return (
+      <VoiceCallLayout
+        currentUser={currentUser}
+        voiceUsers={voiceUsers}
+        webcamStreams={webcamStreams}
+        screenShares={screenShares}
+        isMuted={isMuted}
+        isDeafened={isDeafened}
+        isCameraOn={isCameraOn}
+        isSharingScreen={isSharingScreen}
+        onToggleMic={onToggleMic}
+        onToggleDeafen={onToggleDeafen}
+        onToggleCamera={onToggleCamera}
+        onToggleScreenShare={onToggleScreenShare}
+        onLeaveVoice={onLeaveVoice}
+        speakingPeers={speakingPeers}
+        onBackToChat={() => onShowVoiceLayout(false)}
+        channelName={channel.name}
+      />
+    )
+  }
 
   function handleSend() {
     if (!input.trim()) return

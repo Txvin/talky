@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { WORKSPACES_META } from '../../constants'
 import { useAuth } from '../../context/AuthContext'
 import { useMessages } from '../../hooks/useMessages'
@@ -13,15 +13,29 @@ export default function TalkyApp({ onOpenSettings, onGoHome }) {
   const { logout } = useAuth()
   const [activeWs, setActiveWs] = useState('dev-squad')
   const [activeCh, setActiveCh] = useState('geral')
+  const [showVoiceLayout, setShowVoiceLayout] = useState(false)
 
   const { messages, sendMessage } = useMessages(activeCh)
   const members = useMembers()
   const voice = useVoice(activeWs)
 
+  // Quando sair da chamada de voz (por exemplo, ao clicar no botão de desligar), esconde o layout de sobreposição
+  useEffect(() => {
+    if (!voice.inVoiceRoom) {
+      setShowVoiceLayout(false)
+    }
+  }, [voice.inVoiceRoom])
+
   function handleSelectWs(wsKey) {
     setActiveWs(wsKey)
     const firstCh = Object.keys(WORKSPACES_META[wsKey].channels)[0]
     setActiveCh(firstCh)
+    setShowVoiceLayout(false)
+  }
+
+  function handleSelectCh(chKey) {
+    setActiveCh(chKey)
+    setShowVoiceLayout(false)
   }
 
   const channel = WORKSPACES_META[activeWs].channels[activeCh]
@@ -30,14 +44,25 @@ export default function TalkyApp({ onOpenSettings, onGoHome }) {
     <div className="app-layout active">
       <Rail activeWs={activeWs} onSelectWs={handleSelectWs} onGoHome={onGoHome} />
 
-               <Sidebar
+      <Sidebar
         activeWs={activeWs}
         activeCh={activeCh}
-        onSelectCh={setActiveCh}
+        onSelectCh={handleSelectCh}
         onOpenSettings={onOpenSettings}
         onLogout={logout}
         inVoiceRoom={voice.inVoiceRoom}
-        onToggleVoice={voice.toggleVoiceRoom}
+        onToggleVoice={() => {
+          if (!voice.inVoiceRoom) {
+            voice.toggleVoiceRoom()
+            setShowVoiceLayout(true)
+          } else {
+            if (!showVoiceLayout) {
+              setShowVoiceLayout(true)
+            } else {
+              voice.toggleVoiceRoom()
+            }
+          }
+        }}
         isMuted={voice.isMuted}
         isDeafened={voice.isDeafened}
         onToggleMic={voice.toggleMic}
@@ -47,7 +72,7 @@ export default function TalkyApp({ onOpenSettings, onGoHome }) {
         onToggleScreenShare={voice.toggleScreenShare}
       />
 
-            <ChatMain
+      <ChatMain
         channel={channel}
         messages={messages}
         onSendMessage={sendMessage}
@@ -56,6 +81,8 @@ export default function TalkyApp({ onOpenSettings, onGoHome }) {
         webcamStreams={voice.webcamStreams}
         voiceUsers={voice.voiceUsers}
         inVoiceRoom={voice.inVoiceRoom}
+        showVoiceLayout={showVoiceLayout}
+        onShowVoiceLayout={setShowVoiceLayout}
         isMuted={voice.isMuted}
         isDeafened={voice.isDeafened}
         isSharingScreen={voice.isSharingScreen}

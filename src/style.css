@@ -1370,3 +1370,369 @@ img { display:block; max-width:100%; object-fit:cover; }
   font-size: 9px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
+
+/* ==========================================================================
+   Voice Call Layout (Imersivo)
+   ========================================================================== */
+.voice-call-layout-container {
+  display: flex;
+  flex-direction: column;
+  background-color: #0b0e14; /* Preto profundo */
+  height: 100%;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+}
+
+.voice-call-layout-container.is-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9999;
+}
+
+/* Cabeçalho */
+.voice-call-header {
+  height: 54px;
+  background-color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.vch-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vch-icon-volume {
+  color: var(--cyan);
+  font-size: 14px;
+}
+
+.vch-title {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  color: #fff;
+}
+
+.vch-channel-name {
+  font-size: 12px;
+  color: var(--tx-3);
+  font-weight: 500;
+}
+
+.vch-right {
+  display: flex;
+  align-items: center;
+}
+
+.vch-chat-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: all var(--dur) var(--ease);
+}
+
+.vch-chat-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* Área Central */
+.voice-call-main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Hero Compartilhamento de Tela */
+.voice-call-screens-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.voice-screen-share-hero {
+  position: relative;
+  aspect-ratio: 16/9;
+  background-color: #000;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  max-height: 55vh;
+}
+
+.voice-screen-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.voice-screen-meta {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.live-pill {
+  background-color: var(--red);
+  color: #fff;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+/* Grid de Câmeras/Cards */
+.voice-call-grid {
+  flex: 1;
+  display: grid;
+  gap: 16px;
+  min-height: 200px;
+}
+
+.voice-call-grid.grid-1 {
+  grid-template-columns: 1fr;
+}
+
+.voice-call-grid.grid-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.voice-call-grid.grid-3,
+.voice-call-grid.grid-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+/* Blocos de Participantes */
+.voice-call-tile {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  border: 2px solid transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--dur) var(--ease);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.voice-call-tile.speaking {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+}
+
+.voice-tile-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.voice-tile-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.voice-tile-circle {
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  background-color: #008000; /* Verde */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 128, 0, 0.4);
+}
+
+.voice-circle-initials {
+  color: #fff;
+  font-size: 32px;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  opacity: 0.9;
+}
+
+/* Legenda do card (Idêntico à imagem de referência) */
+.voice-tile-subtitle {
+  position: absolute;
+  bottom: 50px;
+  left: 20px;
+  right: 20px;
+  text-align: center;
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+  font-family: 'Outfit', sans-serif;
+  animation: fadeIn 0.3s ease;
+}
+
+.voice-tile-meta-overlay {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.voice-tile-username {
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 3px 8px;
+  border-radius: var(--r-xs);
+  backdrop-filter: blur(4px);
+}
+
+.voice-tile-status-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.voice-tile-status-icon.muted {
+  background-color: var(--red);
+  color: #fff;
+}
+
+/* Barra de controles */
+.voice-call-controls-bar {
+  height: 80px;
+  background-color: #05070a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
+}
+
+.vcc-left-spacer {
+  width: 100px;
+}
+
+.vcc-center-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.vcc-btn-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background-color: #2b2d31;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all var(--dur) var(--ease);
+}
+
+.vcc-btn-circle:hover {
+  transform: translateY(-2px) scale(1.04);
+  background-color: #3f4248;
+}
+
+.vcc-btn-circle.active {
+  background-color: #4752c4;
+}
+
+.vcc-btn-circle.active:hover {
+  background-color: #5b66e4;
+}
+
+.vcc-btn-circle.disabled {
+  background-color: #2b2d31;
+  color: var(--red);
+  position: relative;
+}
+
+/* Telefone Vermelho Desconectar */
+.vcc-btn-circle.disconnect {
+  background-color: var(--red);
+}
+
+.vcc-btn-circle.disconnect:hover {
+  background-color: #d82c2c;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+}
+
+.vcc-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100px;
+  justify-content: flex-end;
+}
+
+.vcc-small-btn {
+  background: none;
+  border: none;
+  color: var(--tx-2);
+  font-size: 14px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-sm);
+  transition: all var(--dur) var(--ease);
+}
+
+.vcc-small-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
