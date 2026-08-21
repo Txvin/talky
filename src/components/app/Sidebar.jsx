@@ -1,8 +1,8 @@
-import { WORKSPACES_META } from '../../constants'
 import { useAuth } from '../../context/AuthContext'
 
 export default function Sidebar({
-  activeWs,
+  activeServer,
+  activeServerChannels,
   activeCh,
   onSelectCh,
   onOpenSettings,
@@ -16,16 +16,32 @@ export default function Sidebar({
   voiceUsers,
   isSharingScreen,
   onToggleScreenShare,
+  onOpenInvite,
 }) {
   const { currentUser } = useAuth()
-  const ws = WORKSPACES_META[activeWs]
   const avatar = currentUser?.avatar_url || currentUser?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80'
+
+  const serverName = activeServer?.name || 'Servidor'
 
   return (
     <aside className="app-sidebar" aria-label="Canais">
       <div className="sidebar-header">
-        <h2 className="workspace-name">{ws.name}</h2>
-        <button className="sidebar-header-btn"><i className="fa-solid fa-chevron-down"></i></button>
+        <h2 className="workspace-name">{serverName}</h2>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {/* Botão de convidar pessoas */}
+          {onOpenInvite && (
+            <button
+              className="sidebar-header-btn"
+              title="Convidar pessoas"
+              onClick={onOpenInvite}
+            >
+              <i className="fa-solid fa-user-plus" style={{ fontSize: '.8rem' }}></i>
+            </button>
+          )}
+          <button className="sidebar-header-btn">
+            <i className="fa-solid fa-chevron-down"></i>
+          </button>
+        </div>
       </div>
 
       <div className="sidebar-scroll">
@@ -34,7 +50,7 @@ export default function Sidebar({
             <i className="fa-solid fa-chevron-down"></i> TEXTO
           </button>
           <div className="ch-list">
-            {Object.entries(ws.channels).map(([key, ch]) => (
+            {Object.entries(activeServerChannels).map(([key, ch]) => (
               <button
                 key={key}
                 className={`ch-row${activeCh === key ? ' active' : ''}`}
@@ -87,7 +103,7 @@ export default function Sidebar({
           <strong>{currentUser?.name}</strong>
           <span>{currentUser?.status || 'Online'}</span>
         </div>
-                <div className="up-actions">
+        <div className="up-actions">
           <button className={`up-btn${isMuted ? ' muted' : ''}`} title="Microfone" onClick={onToggleMic}>
             <i className={`fa-solid ${isMuted ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
           </button>

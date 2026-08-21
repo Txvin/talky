@@ -4,11 +4,13 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import LandingPage from './components/landing/LandingPage'
 import AuthModal from './components/auth/AuthModal'
 import TalkyApp from './components/app/TalkyApp'
+import SettingsModal from './components/app/SettingsModal'
 
 function AppShell() {
   const { currentUser, loading } = useAuth()
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showApp, setShowApp] = useState(true) // permite "voltar pra landing" sem deslogar
+  const [showSettingsModal, setShowSettingsModal] = useState(false)
 
   function handleRequestAuth() {
     if (currentUser) {
@@ -34,12 +36,16 @@ function AppShell() {
       {isInApp && (
         <TalkyApp
           onGoHome={handleGoHome}
-          onOpenSettings={() => alert('Settings modal vem no próximo passo!')}
+          onOpenSettings={() => setShowSettingsModal(true)}
         />
       )}
 
       {showAuthModal && !currentUser && (
         <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
+
+      {showSettingsModal && currentUser && (
+        <SettingsModal onClose={() => setShowSettingsModal(false)} />
       )}
 
       {loading.active && (

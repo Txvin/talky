@@ -1,36 +1,57 @@
-import { WORKSPACES_META } from '../../constants'
+// Rail.jsx — Barra lateral de servidores (dinâmica + botões de criar/entrar)
+export default function Rail({ servers, activeServerId, onSelectServer, onGoHome, onOpenCreate, onOpenJoin }) {
 
-const WS_ICONS = {
-  'dev-squad': 'fa-code',
-  'gaming-hub': 'fa-gamepad',
-  'design-lab': 'fa-palette',
-}
+  // Gera iniciais para servidores sem ícone
+  function serverInitials(name) {
+    return (name || '?').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  }
 
-export default function Rail({ activeWs, onSelectWs, onGoHome }) {
   return (
-    <aside className="app-rail" aria-label="Espaços de trabalho">
+    <aside className="app-rail" aria-label="Servidores">
+      {/* Botão home */}
       <button className="rail-home" title="Início" onClick={onGoHome}>
         <i className="fa-solid fa-waveform-lines"></i>
       </button>
       <div className="rail-sep"></div>
 
+      {/* Lista de servidores */}
       <div className="rail-list">
-        {Object.keys(WORKSPACES_META).map(wsKey => (
+        {servers.map(server => (
           <button
-            key={wsKey}
-            className={`rail-item${activeWs === wsKey ? ' active' : ''}`}
-            title={WORKSPACES_META[wsKey].name}
-            onClick={() => onSelectWs(wsKey)}
+            key={server.id}
+            className={`rail-item rail-item-server${activeServerId === server.id ? ' active' : ''}`}
+            title={server.name}
+            onClick={() => onSelectServer(server)}
           >
             <span className="rail-pip"></span>
-            <i className={`fa-solid ${WS_ICONS[wsKey]}`}></i>
+            {server.icon_url ? (
+              <img
+                src={server.icon_url}
+                alt={server.name}
+                className="rail-server-icon"
+              />
+            ) : (
+              <span className="rail-server-initials">{serverInitials(server.name)}</span>
+            )}
           </button>
         ))}
       </div>
 
+      {/* Ações no fundo: criar e entrar */}
       <div className="rail-bottom">
-        <button className="rail-add" title="Novo Espaço">
+        <button
+          className="rail-add rail-add-create"
+          title="Criar Servidor"
+          onClick={onOpenCreate}
+        >
           <i className="fa-solid fa-plus"></i>
+        </button>
+        <button
+          className="rail-add rail-add-join"
+          title="Entrar com Convite"
+          onClick={onOpenJoin}
+        >
+          <i className="fa-solid fa-compass"></i>
         </button>
       </div>
     </aside>
