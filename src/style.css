@@ -607,6 +607,7 @@ img { display:block; max-width:100%; object-fit:cover; }
 
 /* Preset list */
 .preset-list { display:flex; flex-direction:column; gap:8px; }
+.preset-hint { font-size:11px; color:var(--tx-3); margin:0 0 10px; line-height:1.5; }
 .preset-item {
   display:flex; align-items:center; gap:14px;
   padding:12px 14px; border-radius:var(--r-md);
@@ -907,7 +908,15 @@ img { display:block; max-width:100%; object-fit:cover; }
   display:flex; align-items:center; gap:6px;
   background:rgba(0,0,0,.2); border-top:1px solid var(--border);
   flex-shrink:0;
+  position:relative;
 }
+.up-clickable {
+  display:flex; align-items:center; gap:8px; flex:1; min-width:0;
+  padding:4px 6px; margin:0 -6px; border-radius:var(--r-xs);
+  cursor:pointer;
+  transition:background var(--dur) var(--ease);
+}
+.up-clickable:hover { background:rgba(255,255,255,.06); }
 .up-avatar-wrap { position:relative; width:30px; height:30px; flex-shrink:0; }
 .up-avatar  { width:30px; height:30px; border-radius:50%; }
 .up-status-dot {
@@ -917,10 +926,49 @@ img { display:block; max-width:100%; object-fit:cover; }
 }
 .up-status-dot.online { background:var(--green); }
 .up-status-dot.dnd    { background:var(--red); }
+.up-status-dot.lg     { width:14px; height:14px; border-width:3px; border-color:var(--s4); }
 
 .up-meta { flex:1; min-width:0; display:flex; flex-direction:column; }
 .up-meta strong { font-size:12px; font-weight:700; color:var(--tx-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .up-meta span   { font-size:10px; color:var(--tx-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+/* Cartão de perfil (popover estilo Discord) */
+.up-profile-card {
+  position:absolute; left:8px; bottom:calc(100% + 8px);
+  width:260px; border-radius:var(--r-md);
+  background:var(--s4); border:1px solid var(--border);
+  box-shadow:0 12px 32px rgba(0,0,0,.45);
+  overflow:hidden; z-index:40;
+  animation:upcIn .14s var(--ease);
+}
+@keyframes upcIn {
+  from { opacity:0; transform:translateY(6px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.upc-banner {
+  height:56px;
+  background:linear-gradient(135deg, var(--indigo), var(--cyan));
+}
+.upc-avatar-wrap { position:relative; margin:-28px 0 0 16px; width:56px; height:56px; }
+.upc-avatar {
+  width:56px; height:56px; border-radius:50%;
+  border:4px solid var(--s4);
+  display:block;
+}
+.upc-body { padding:8px 16px 16px; display:flex; flex-direction:column; }
+.upc-name { font-size:15px; font-weight:700; color:var(--tx-1); }
+.upc-handle { font-size:12px; color:var(--tx-2); margin-top:1px; }
+.upc-divider { height:1px; background:var(--border); margin:10px 0; }
+.upc-label { font-size:10px; font-weight:700; letter-spacing:.04em; color:var(--tx-3); }
+.upc-status { font-size:12px; color:var(--tx-1); margin-top:3px; }
+.upc-custom-status { font-size:12px; color:var(--tx-2); font-style:italic; margin-top:2px; }
+.upc-edit-btn {
+  margin-top:12px; padding:8px 10px; border-radius:var(--r-sm);
+  background:var(--s5); color:var(--tx-1); font-size:12.5px; font-weight:600;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+  transition:background var(--dur) var(--ease);
+}
+.upc-edit-btn:hover { background:var(--indigo); }
 
 .up-actions { display:flex; gap:1px; }
 .up-btn {
@@ -1080,8 +1128,18 @@ img { display:block; max-width:100%; object-fit:cover; }
 .mp-av-wrap { position:relative; flex-shrink:0; }
 .mp-av { width:30px; height:30px; border-radius:50%; }
 .mp-dot { position:absolute; bottom:-1px; right:-1px; width:9px; height:9px; border-radius:50%; border:2px solid var(--s2); }
-.mp-dot.online { background:var(--green); }
-.mp-dot.dnd    { background:var(--red); }
+.mp-dot.online  { background:var(--green); }
+.mp-dot.dnd     { background:var(--red); }
+.mp-dot.offline { background:var(--tx-3); }
+
+.mp-member.offline .mp-av { opacity:.4; filter:grayscale(60%); }
+.mp-member.offline .mp-info strong { opacity:.5; }
+
+.mp-empty {
+  display:flex; flex-direction:column; align-items:center; gap:8px;
+  padding:24px 8px; color:var(--tx-3); font-size:12px; text-align:center;
+}
+.mp-empty i { font-size:20px; opacity:.6; }
 
 .mp-info { display:flex; flex-direction:column; overflow:hidden; }
 .mp-info strong { font-size:13px; color:var(--tx-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1278,6 +1336,115 @@ img { display:block; max-width:100%; object-fit:cover; }
 .vcp-btn.danger:hover {
   background: #dc2626;
   box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+/* ==========================================================================
+   Aviso de Compartilhamento de Tela (opt-in) — banner compacto + tile
+   ========================================================================== */
+.screen-share-strip {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 20px 0;
+}
+
+.screen-share-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: var(--r-md);
+  background: var(--s4);
+  border: 1px solid var(--border);
+}
+
+.ssb-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--tx-2);
+  min-width: 0;
+}
+
+.ssb-info strong { color: var(--tx-1); }
+
+.ssb-icon {
+  color: var(--cyan);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.ssb-watch-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--r-sm);
+  background: var(--indigo);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.ssb-watch-btn:hover {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+.screen-share-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.screen-tile {
+  border-radius: var(--r-md);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+  position: relative;
+  aspect-ratio: 16/9;
+}
+
+.screen-tile-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.screen-tile-label {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, .6);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.screen-tile-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, .55);
+  backdrop-filter: blur(4px);
+  transition: background var(--dur) var(--ease);
+}
+
+.screen-tile-close:hover {
+  background: var(--red);
 }
 
 .vcp-live-badge {
@@ -1505,66 +1672,23 @@ img { display:block; max-width:100%; object-fit:cover; }
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 20px;
-  gap: 20px;
+  padding: 10px;
+  gap: 10px;
   min-height: 0;
   overflow-y: auto;
 }
 
-/* Hero Compartilhamento de Tela */
-.voice-call-screens-container {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.voice-screen-share-hero {
-  position: relative;
-  aspect-ratio: 16/9;
-  background-color: #000;
-  border-radius: var(--r-lg);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  max-height: 55vh;
-}
-
-.voice-screen-video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.voice-screen-meta {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 4px 10px;
-  border-radius: var(--r-xs);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.live-pill {
-  background-color: var(--red);
-  color: #fff;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 9px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-}
-
-/* Grid de Câmeras/Cards */
+/* Grid de Câmeras/Cards — moldura azul contínua, tiles colados */
 .voice-call-grid {
   flex: 1;
   display: grid;
-  gap: 16px;
+  gap: 3px;
   min-height: 200px;
+  background-color: #060708;
+  border: 2px solid var(--cyan, #3ea6ff);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4), 0 8px 30px rgba(0, 0, 0, 0.45);
 }
 
 .voice-call-grid.grid-1 {
@@ -1584,25 +1708,28 @@ img { display:block; max-width:100%; object-fit:cover; }
 /* Blocos de Participantes */
 .voice-call-tile {
   position: relative;
-  border-radius: var(--r-lg);
+  border-radius: 0;
   overflow: hidden;
-  border: 2px solid transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--dur) var(--ease);
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: box-shadow var(--dur) var(--ease);
 }
 
 .voice-call-tile.speaking {
-  border-color: #22c55e !important;
-  box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+  box-shadow: inset 0 0 0 3px #22c55e;
+  z-index: 1;
 }
 
 .voice-tile-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.voice-tile-video.is-screen-share {
+  object-fit: contain;
+  background: #000;
 }
 
 .voice-tile-placeholder {
@@ -1613,15 +1740,23 @@ img { display:block; max-width:100%; object-fit:cover; }
   height: 100%;
 }
 
-.voice-tile-circle {
-  width: 90px;
-  height: 90px;
+.voice-tile-avatar-img {
+  width: 88px;
+  height: 88px;
   border-radius: 50%;
-  background-color: #008000; /* Verde */
+  object-fit: cover;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
+}
+
+.voice-tile-circle {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.35);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 15px rgba(0, 128, 0, 0.4);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.35);
 }
 
 .voice-circle-initials {
@@ -1632,149 +1767,274 @@ img { display:block; max-width:100%; object-fit:cover; }
   opacity: 0.9;
 }
 
-/* Legenda do card (Idêntico à imagem de referência) */
-.voice-tile-subtitle {
-  position: absolute;
-  bottom: 50px;
-  left: 20px;
-  right: 20px;
-  text-align: center;
-  color: #fff;
-  font-size: 18px;
-  font-weight: 600;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
-  pointer-events: none;
-  font-family: 'Outfit', sans-serif;
-  animation: fadeIn 0.3s ease;
-}
-
-.voice-tile-meta-overlay {
-  position: absolute;
-  bottom: 12px;
-  left: 12px;
-  right: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  pointer-events: none;
-}
-
-.voice-tile-username {
-  font-size: 12px;
-  font-weight: 700;
-  background: rgba(0, 0, 0, 0.6);
-  padding: 3px 8px;
-  border-radius: var(--r-xs);
-  backdrop-filter: blur(4px);
-}
-
+/* Indicador de mudo — badge discreto no canto do tile */
 .voice-tile-status-icon {
-  width: 20px;
-  height: 20px;
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
 .voice-tile-status-icon.muted {
-  background-color: var(--red);
-  color: #fff;
+  color: var(--red);
 }
 
-/* Barra de controles */
-.voice-call-controls-bar {
-  height: 80px;
-  background-color: #05070a;
+/* Badge "Compartilhando tela" — pílula no topo do tile */
+.voice-tile-status-icon.screen-share-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  bottom: auto;
+  right: auto;
+  width: auto;
+  height: auto;
+  border-radius: var(--r-xs);
+  padding: 4px 10px;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+/* Overlay "está compartilhando a tela" — some assim que a pessoa clica
+   em Assistir; até lá, o vídeo real não é reproduzido (economiza banda
+   e imita o Discord: cada um escolhe se quer ver). */
+.voice-tile-watch-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 20px;
+  background: rgba(10, 10, 14, 0.72);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+  transition: background var(--dur) var(--ease);
+}
+
+.voice-tile-watch-overlay:hover {
+  background: rgba(10, 10, 14, 0.85);
+}
+
+.voice-tile-watch-icon {
+  font-size: 22px;
+  color: var(--cyan);
+}
+
+.voice-tile-watch-text {
+  font-size: 12.5px;
+  color: var(--tx-2);
+  max-width: 200px;
+}
+
+.voice-tile-watch-text strong { color: var(--tx-1); }
+
+.voice-tile-watch-btn {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--r-sm);
+  background: var(--indigo);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  transition: background var(--dur) var(--ease), transform var(--dur) var(--ease);
+}
+
+.voice-tile-watch-overlay:hover .voice-tile-watch-btn {
+  background: #4f46e5;
+  transform: translateY(-1px);
+}
+
+/* Botão pra sair do modo "assistindo" e voltar ao avatar */
+.voice-tile-stop-watch {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  transition: background var(--dur) var(--ease);
+}
+
+.voice-tile-stop-watch:hover {
+  background: var(--red);
+}
+
+/* Nome do participante — canto inferior esquerdo, sempre visível
+   (importante quando o vídeo/tela substitui o avatar) */
+.voice-tile-name-tag {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  border-radius: var(--r-xs);
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  z-index: 2;
+}
+
+/* Barra de controles — pílula compacta centralizada */
+.voice-call-controls-bar {
+  min-height: 56px;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px 14px;
   flex-shrink: 0;
 }
 
-.vcc-left-spacer {
-  width: 100px;
-}
-
-.vcc-center-actions {
+.vcc-pill {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 6px;
+  background-color: #0e0f13;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
 
-.vcc-btn-circle {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+.vcc-group {
+  display: flex;
+  align-items: center;
+  background-color: #1b1d21;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.vcc-sep {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0 4px;
+}
+
+.vcc-sq {
+  width: 38px;
+  height: 38px;
   border: none;
-  background-color: #2b2d31;
+  background-color: #1b1d21;
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 14px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all var(--dur) var(--ease);
 }
 
-.vcc-btn-circle:hover {
-  transform: translateY(-2px) scale(1.04);
-  background-color: #3f4248;
+.vcc-group .vcc-sq {
+  border-radius: 0;
 }
 
-.vcc-btn-circle.active {
+.vcc-sq:hover {
+  background-color: #2b2d31;
+}
+
+.vcc-sq.active {
   background-color: #4752c4;
 }
 
-.vcc-btn-circle.active:hover {
+.vcc-sq.active:hover {
   background-color: #5b66e4;
 }
 
-.vcc-btn-circle.disabled {
-  background-color: #2b2d31;
-  color: var(--red);
-  position: relative;
-}
-
-/* Telefone Vermelho Desconectar */
-.vcc-btn-circle.disconnect {
+.vcc-sq.danger {
   background-color: var(--red);
+  color: #fff;
 }
 
-.vcc-btn-circle.disconnect:hover {
+.vcc-sq.danger:hover {
   background-color: #d82c2c;
-  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
 }
 
-.vcc-right-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100px;
-  justify-content: flex-end;
+.vcc-sq.muted-off {
+  color: var(--red);
 }
 
-.vcc-small-btn {
-  background: none;
+.vcc-caret {
+  width: 22px;
+  height: 38px;
   border: none;
-  color: var(--tx-2);
-  font-size: 14px;
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
+  border-left: 1px solid rgba(0, 0, 0, 0.35);
+  background-color: #1b1d21;
+  color: rgba(255, 255, 255, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: var(--r-sm);
+  font-size: 9px;
+  cursor: pointer;
   transition: all var(--dur) var(--ease);
 }
 
-.vcc-small-btn:hover {
-  background-color: rgba(255, 255, 255, 0.08);
+.vcc-caret:hover {
+  background-color: #2b2d31;
   color: #fff;
+}
+
+.vcc-caret.danger {
+  background-color: var(--red);
+  color: rgba(255, 255, 255, 0.85);
+  border-left-color: rgba(0, 0, 0, 0.25);
+}
+
+.vcc-caret.danger:hover {
+  background-color: #d82c2c;
+}
+
+/* Telefone Vermelho Desconectar — pílula alongada */
+.vcc-hangup {
+  height: 38px;
+  min-width: 52px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--red);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  cursor: pointer;
+  margin-left: 4px;
+  transition: all var(--dur) var(--ease);
+}
+
+.vcc-hangup:hover {
+  background-color: #d82c2c;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
 }
 
 @keyframes fadeIn {
@@ -2232,6 +2492,17 @@ img { display:block; max-width:100%; object-fit:cover; }
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.settings-btn-secondary.danger {
+  color: var(--red);
+  border-color: rgba(239, 68, 68, .35);
+  background: rgba(239, 68, 68, .08);
+}
+
+.settings-btn-secondary.danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, .16);
+  color: var(--red);
 }
 
 /* ==========================================================================

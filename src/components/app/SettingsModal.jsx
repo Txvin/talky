@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react'
 import { useAuth } from '../../context/AuthContext'
+import { applyAccentColor } from '../../utils'
 
 // Paleta de cores de destaque predefinidas
 const PRESET_COLORS = [
@@ -14,7 +15,7 @@ const PRESET_COLORS = [
 ]
 
 export default function SettingsModal({ onClose }) {
-  const { currentUser, updateProfile } = useAuth()
+  const { currentUser, updateProfile, logout } = useAuth()
 
   const [form, setForm] = useState({
     name:         currentUser?.name         || '',
@@ -69,10 +70,31 @@ export default function SettingsModal({ onClose }) {
   }
 
   // ------------------------------------------------------------------
-  // Fechar ao clicar no overlay
+  // Sair da conta
   // ------------------------------------------------------------------
+  function handleLogout() {
+    onClose()
+    logout()
+  }
+
+  // ------------------------------------------------------------------
+  // Fechar ao clicar no overlay
+  // Se fechar sem salvar, desfaz o preview ao vivo da cor de destaque
+  // e volta pra cor que já estava salva no perfil.
+  // ------------------------------------------------------------------
+  function handleClose() {
+    applyAccentColor(currentUser?.accent_color || '#6366f1')
+    onClose()
+  }
+
   function handleOverlayClick(e) {
-    if (e.target === e.currentTarget) onClose()
+    if (e.target === e.currentTarget) handleClose()
+  }
+
+  // Aplica a cor escolhida na hora, em todo o site, antes de salvar
+  function handleAccentPick(color) {
+    setForm(prev => ({ ...prev, accent_color: color }))
+    applyAccentColor(color)
   }
 
   return (
@@ -85,7 +107,7 @@ export default function SettingsModal({ onClose }) {
             <i className="fa-solid fa-user-pen settings-title-icon"></i>
             Configurações de Perfil
           </h2>
-          <button className="settings-close-btn" onClick={onClose} title="Fechar" aria-label="Fechar modal">
+          <button className="settings-close-btn" onClick={handleClose} title="Fechar" aria-label="Fechar modal">
             <i className="fa-solid fa-xmark"></i>
           </button>
         </header>
@@ -217,7 +239,7 @@ export default function SettingsModal({ onClose }) {
                   key={color}
                   className={`settings-color-swatch${form.accent_color === color ? ' selected' : ''}`}
                   style={{ backgroundColor: color }}
-                  onClick={() => setForm(prev => ({ ...prev, accent_color: color }))}
+                  onClick={() => handleAccentPick(color)}
                   title={color}
                   aria-label={`Selecionar cor ${color}`}
                   type="button"
@@ -235,7 +257,7 @@ export default function SettingsModal({ onClose }) {
                 <input
                   type="color"
                   value={form.accent_color}
-                  onChange={e => setForm(prev => ({ ...prev, accent_color: e.target.value }))}
+                  onChange={e => handleAccentPick(e.target.value)}
                   className="settings-color-input-hidden"
                 />
               </label>
@@ -246,11 +268,28 @@ export default function SettingsModal({ onClose }) {
               <span>Pré-visualização da cor selecionada</span>
             </div>
           </section>
+
+          <div className="settings-divider"></div>
+
+          {/* Seção: Conta */}
+          <section className="settings-section">
+            <h3 className="settings-section-title">Conta</h3>
+            <p className="settings-section-desc">
+              Você está conectado como <strong>{currentUser?.name}</strong>.
+            </p>
+            <button
+              type="button"
+              className="settings-btn-secondary sm danger"
+              onClick={handleLogout}
+            >
+              <i className="fa-solid fa-power-off"></i> Sair da conta
+            </button>
+          </section>
         </div>
 
         {/* Rodapé */}
         <footer className="settings-footer">
-          <button className="settings-btn-secondary" onClick={onClose} disabled={isSaving}>
+          <button className="settings-btn-secondary" onClick={handleClose} disabled={isSaving}>
             Cancelar
           </button>
           <button

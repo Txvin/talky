@@ -89,9 +89,16 @@ export default function TalkyApp({ onOpenSettings, onGoHome }) {
 
   // ------------------------------------------------------------------
   // Hooks de mensagens e voz
-  // Usa um ID composto "serverId:channelKey" para escopar mensagens por servidor
+  // IMPORTANTE: CH_IDS (constants.js) só tem UUID para os 5 canais
+  // estáticos de demonstração — servidores criados dinamicamente ainda
+  // não têm uma tabela `channels` no banco, então não existe UUID real
+  // pra eles ainda. Por isso passamos a chave simples (bate com CH_IDS)
+  // para servidores estáticos, e `null` explícito para os dinâmicos —
+  // isso faz o useMessages avisar o usuário em vez de falhar em
+  // silêncio. Quando a tabela `channels` existir, isso passa a resolver
+  // o UUID real de qualquer servidor.
   // ------------------------------------------------------------------
-  const messageRoomId = activeServer ? `${activeServer.id}:${safeActiveCh}` : safeActiveCh
+  const messageRoomId = activeServer?._isStatic ? safeActiveCh : null
   const { messages, sendMessage } = useMessages(messageRoomId)
   const members = useMembers()
   const voice = useVoice(activeServer?.id || 'default')

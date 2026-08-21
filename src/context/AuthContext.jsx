@@ -1,13 +1,50 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../supabase'
 import { useToast } from './ToastContext'
+import { applyAccentColor } from '../utils'
 
 const AuthContext = createContext(null)
+
+const SUPABASE_URL  = 'https://ntfgfdtnnfuyuunacyxi.supabase.co'
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im50ZmdmZHRubmZ1eXV1bmFjeXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY4Mjg3NjMsImV4cCI6MjEwMjQwNDc2M30.JRCwnCnrpI4pbM3vqB5307KsMtEmQSvE3CsTa-mxoxk'
+
+// ------------------------------------------------------------------
+// Marca o usuário como offline de forma confiável ao fechar/recarregar
+// a aba. Uma chamada supabase-js normal (fetch assíncrono) costuma ser
+// cancelada nesse momento — por isso usamos fetch com keepalive: true,
+// que o navegador garante completar mesmo com a página descarregando.
+// ------------------------------------------------------------------
+function markOfflineBeacon(userId) {
+  if (!userId) return
+  try {
+    fetch(`${SUPABASE_URL}/rest/v1/users?id=eq.${userId}`, {
+      method: 'PATCH',
+      keepalive: true,
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_ANON,
+        Authorization: `Bearer ${SUPABASE_ANON}`,
+      },
+      body: JSON.stringify({ is_online: false }),
+    })
+  } catch (err) {
+    console.warn('Falha ao marcar usuário como offline:', err)
+  }
+}
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null)
   const [loading, setLoading] = useState({ active: false, progress: 0, text: '' })
   const toast = useToast()
+  const currentUserRef = useRef(null)
+
+  useEffect(() => {
+    currentUserRef.current = currentUser
+    // Sempre que o usuário logado mudar (login, restauração de sessão,
+    // troca de conta), aplica a cor de destaque salva no perfil dele
+    // — se não tiver nenhuma ainda, volta pro roxo/indigo padrão.
+    applyAccentColor(currentUser?.accent_color || '#6366f1')
+  }, [currentUser])
 
   // ------------------------------------------------------------------
   // Transição de loading (igual ao original: barra de progresso falsa)
@@ -33,7 +70,20 @@ export function AuthProvider({ children }) {
   // ------------------------------------------------------------------
   async function login(user) {
     localStorage.setItem('talky_user', JSON.stringify(user))
-    await supabase.from('users').update({ is_online: true }).eq('id', user.id)
+    // upsert em vez de update: contas demo/preset ainda não existem na
+    // tabela `users` na primeira vez — um UPDATE não cria a linha, só
+    // um upsert garante que o membro passe a existir e apareça no painel.
+    const { error } = await supabase.from('users').upsert({
+      id: user.id,
+      name: user.name,
+      handle: user.handle || '@' + user.name.split(' ')[0].toLowerCase(),
+      email: user.email || `${user.id}@talky.local`,
+      avatar_url: user.avatar_url || user.avatar || null,
+      role: user.role || 'Membro',
+      status: user.status || 'Online',
+      is_online: true,
+    }, { onConflict: 'id' })
+    if (error) console.error('Erro ao sincronizar usuário no login:', error)
     loadingTransition(() => setCurrentUser(user), `Entrando como ${user.name}...`)
   }
 
@@ -45,6 +95,10 @@ export function AuthProvider({ children }) {
       await supabase.from('users').update({ is_online: false }).eq('id', currentUser.id)
     }
     localStorage.removeItem('talky_user')
+    // Encerra também a sessão real do Supabase Auth (Google/email+senha).
+    // Sem isso, a sessão continuava válida no navegador e o listener
+    // onAuthStateChange logava o usuário de volta sozinho no próximo reload.
+    await supabase.auth.signOut()
     loadingTransition(() => setCurrentUser(null), 'Saindo da conta...')
   }
 
@@ -79,11 +133,24 @@ export function AuthProvider({ children }) {
     const saved = localStorage.getItem('talky_user')
     if (saved) {
       try {
-        setCurrentUser(JSON.parse(saved))
+        const savedUser = JSON.parse(saved)
+        setCurrentUser(savedUser)
+        // Volta a marcar como online (pode ter ficado offline num fechamento anterior)
+        supabase.from('users').update({ is_online: true }).eq('id', savedUser.id)
       } catch {
         localStorage.removeItem('talky_user')
       }
     }
+
+    // ------------------------------------------------------------------
+    // Marca offline ao fechar a aba/janela. 'pagehide' é mais confiável
+    // que 'beforeunload' (também dispara em navegação por bfcache/mobile).
+    // ------------------------------------------------------------------
+    function handleUnload() {
+      markOfflineBeacon(currentUserRef.current?.id)
+    }
+    window.addEventListener('pagehide', handleUnload)
+    window.addEventListener('beforeunload', handleUnload)
 
     // Escuta eventos de autenticação do Supabase (OAuth Google, etc.)
     // O Supabase SDK detecta automaticamente o token na URL após o redirecionamento
@@ -117,9 +184,12 @@ export function AuthProvider({ children }) {
         await supabase.from('users').update({ is_online: true }).eq('id', existing.id)
         resolvedUser = existing
       } else {
-        // Novo usuário OAuth — cria perfil na tabela users
+        // Novo usuário (Google OAuth ou cadastro por e-mail/senha) — cria
+        // o perfil na tabela users. Preferimos o handle escolhido no
+        // cadastro (meta.handle); só geramos um a partir do nome quando
+        // não veio nenhum (caso do login via Google).
         const name = meta.full_name || meta.name || authUser.email.split('@')[0]
-        const handle = '@' + name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
+        const handle = meta.handle || '@' + name.split(' ')[0].toLowerCase().replace(/[^a-z0-9]/g, '')
         resolvedUser = {
           id: authUser.id,
           name,
@@ -127,8 +197,8 @@ export function AuthProvider({ children }) {
           email: authUser.email,
           avatar_url: meta.avatar_url || meta.picture ||
             'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-          role: 'Membro Google',
-          status: 'Conectado via Google',
+          role: meta.name ? 'Membro Talky' : 'Membro Google',
+          status: 'Acabou de entrar!',
           is_online: true,
         }
         await supabase.from('users').upsert(resolvedUser)
@@ -141,7 +211,11 @@ export function AuthProvider({ children }) {
       )
     })
 
-    return () => sub.subscription.unsubscribe()
+    return () => {
+      sub.subscription.unsubscribe()
+      window.removeEventListener('pagehide', handleUnload)
+      window.removeEventListener('beforeunload', handleUnload)
+    }
   }, [])
 
   const value = { currentUser, setCurrentUser, login, logout, updateProfile, loading, loadingTransition, toast }

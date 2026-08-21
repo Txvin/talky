@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
-function ScreenTile({ label, stream }) {
+function ScreenTile({ label, stream, onClose }) {
   const videoRef = useRef(null)
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -16,24 +16,51 @@ function ScreenTile({ label, stream }) {
   }, [stream])
 
   return (
-    <div style={{
-      borderRadius: 'var(--r-md)', overflow: 'hidden', border: '1px solid var(--border)',
-      background: '#000', position: 'relative', aspectRatio: '16/9',
-    }}>
+    <div className="screen-tile">
       {/* Sempre muted para contornar políticas de autoplay do Chrome e garantir início imediato do vídeo */}
-      <video ref={videoRef} autoPlay playsInline muted style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-      <span style={{
-        position: 'absolute', bottom: 6, left: 8, fontSize: 11, fontWeight: 700,
-        color: '#fff', background: 'rgba(0,0,0,.6)', padding: '2px 8px', borderRadius: 4,
-      }}>
-        {label}
-      </span>
+      <video ref={videoRef} autoPlay playsInline muted className="screen-tile-video" />
+      <span className="screen-tile-label">{label}</span>
+      <button className="screen-tile-close" title="Fechar transmissão" onClick={onClose}>
+        <i className="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  )
+}
+
+// Aviso compacto — não abre a transmissão sozinho, só avisa que existe
+// uma ativa. Cada pessoa decide se quer assistir ou não.
+function ScreenShareBanner({ label, onWatch }) {
+  return (
+    <div className="screen-share-banner">
+      <div className="ssb-info">
+        <i className="fa-solid fa-arrow-up-from-bracket ssb-icon"></i>
+        <span><strong>{label}</strong> está compartilhando a tela</span>
+      </div>
+      <button className="ssb-watch-btn" onClick={onWatch}>
+        <i className="fa-solid fa-eye"></i> Assistir
+      </button>
     </div>
   )
 }
 
 export default function ScreenShareStrip({ screenShares, currentUserName, voiceUsers }) {
   const entries = Object.entries(screenShares)
+  const [watching, setWatching] = useState(() => new Set())
+
+  // Se a pessoa parar de compartilhar, tira ela da lista de "assistindo"
+  // pra não sobrar estado morto (e não reabrir sozinho se ela compartilhar de novo).
+  useEffect(() => {
+    setWatching(prev => {
+      const activeIds = new Set(entries.map(([id]) => id))
+      let changed = false
+      const next = new Set(prev)
+      for (const id of prev) {
+        if (!activeIds.has(id)) { next.delete(id); changed = true }
+      }
+      return changed ? next : prev
+    })
+  }, [screenShares])
+
   if (entries.length === 0) return null
 
   function labelFor(peerId) {
@@ -42,14 +69,45 @@ export default function ScreenShareStrip({ screenShares, currentUserName, voiceU
     return found ? found[1]?.name || 'Membro' : 'Membro'
   }
 
+  function watch(peerId) {
+    setWatching(prev => new Set(prev).add(peerId))
+  }
+  function stopWatching(peerId) {
+    setWatching(prev => {
+      const next = new Set(prev)
+      next.delete(peerId)
+      return next
+    })
+  }
+
+  const watched = entries.filter(([peerId]) => watching.has(peerId))
+  const notWatched = entries.filter(([peerId]) => !watching.has(peerId))
+
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: `repeat(${Math.min(entries.length, 2)}, 1fr)`,
-      gap: 10, padding: '14px 20px 0',
-    }}>
-      {entries.map(([peerId, stream]) => (
-        <ScreenTile key={peerId} label={labelFor(peerId)} stream={stream} isMe={peerId === 'me'} />
+    <div className="screen-share-strip">
+      {notWatched.map(([peerId]) => (
+        <ScreenShareBanner
+          key={peerId}
+          label={labelFor(peerId)}
+          onWatch={() => watch(peerId)}
+        />
       ))}
+
+      {watched.length > 0 && (
+        <div
+          className="screen-share-grid"
+          style={{ gridTemplateColumns: `repeat(${Math.min(watched.length, 2)}, 1fr)` }}
+        >
+          {watched.map(([peerId, stream]) => (
+            <ScreenTile
+              key={peerId}
+              label={labelFor(peerId)}
+              stream={stream}
+              onClose={() => stopWatching(peerId)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }

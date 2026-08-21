@@ -1,11 +1,18 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '../supabase'
 import { CH_IDS } from '../constants'
+import { useToast } from '../context/ToastContext'
 
+// chKey deve ser uma chave presente em CH_IDS (canais estáticos de
+// demonstração). Para servidores criados dinamicamente ainda não temos
+// uma tabela `channels` no banco com UUID por canal — nesse caso o
+// TalkyApp passa `null` aqui de propósito, e avisamos o usuário em vez
+// de falhar em silêncio (era isso que fazia o chat "não fazer nada").
 export function useMessages(chKey) {
   const [messages, setMessages] = useState([])
   const channelRef = useRef(null)
   const renderedIds = useRef(new Set())
+  const toast = useToast()
 
   useEffect(() => {
     const channelId = CH_IDS[chKey]
@@ -70,8 +77,14 @@ export function useMessages(chKey) {
   }, [chKey])
 
   const sendMessage = useCallback(async (content, currentUser) => {
+    if (!content.trim() || !currentUser) return
+
     const channelId = CH_IDS[chKey]
-    if (!channelId || !currentUser || !content.trim()) return
+    if (!channelId) {
+      // Servidor sem canal persistido no banco (ver comentário acima).
+      toast('Este servidor ainda não tem chat configurado no banco de dados.', 'error')
+      return
+    }
 
     const msgObj = {
       id: crypto.randomUUID(),
@@ -87,13 +100,18 @@ export function useMessages(chKey) {
 
     channelRef.current?.send({ type: 'broadcast', event: 'new_msg', payload: msgObj })
 
-    await supabase.from('messages').insert({
+    const { error } = await supabase.from('messages').insert({
       id: msgObj.id,
       channel_id: channelId,
       user_id: currentUser.id,
       content: msgObj.content,
     })
-  }, [chKey])
+
+    if (error) {
+      console.error('Erro ao salvar mensagem:', error)
+      toast('Sua mensagem não foi salva. Tente reenviar.', 'error')
+    }
+  }, [chKey, toast])
 
   return { messages, sendMessage }
 }

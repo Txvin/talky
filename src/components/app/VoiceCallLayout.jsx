@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef } from 'react'
+import { useToast } from '../../context/ToastContext'
 
 // ─── Subcomponentes definidos FORA do componente pai ────────────────────────
 // Isso é CRÍTICO: se definidos dentro, o React recria o componente a cada render,
 // desmonta o <video>, limpa o srcObject e a tela fica preta.
 
-function VideoElement({ stream, isLocal }) {
+function VideoElement({ stream, isLocal, mirror, isScreenShare }) {
   const videoRef = useRef(null)
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -25,35 +26,9 @@ function VideoElement({ stream, isLocal }) {
       autoPlay
       playsInline
       muted={isLocal}
-      className="voice-tile-video"
-      style={isLocal ? { transform: 'scaleX(-1)' } : {}}
+      className={`voice-tile-video${isScreenShare ? ' is-screen-share' : ''}`}
+      style={mirror ? { transform: 'scaleX(-1)' } : {}}
     />
-  )
-}
-
-function ScreenShareWidget({ peerId, stream, ownerName }) {
-  const videoRef = useRef(null)
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      if (videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream
-        videoRef.current.play().catch(e => {
-          if (e.name !== 'AbortError') {
-            console.warn('Erro ao reproduzir tela compartilhada:', e)
-          }
-        })
-      }
-    }
-  }, [stream])
-
-  return (
-    <div className="voice-screen-share-hero">
-      <video ref={videoRef} autoPlay playsInline muted className="voice-screen-video" />
-      <div className="voice-screen-meta">
-        <span className="live-pill">AO VIVO</span>
-        <span>Transmissão de tela de {ownerName}</span>
-      </div>
-    </div>
   )
 }
 
@@ -88,6 +63,43 @@ export default function VoiceCallLayout({
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef(null)
+  const toast = useToast()
+
+  // ------------------------------------------------------------------
+  // Igual ao Discord: uma tela compartilhada não toca sozinha pra quem
+  // assiste — cada pessoa escolhe se quer assistir (peerId → watching).
+  // O dono da própria transmissão sempre vê a própria prévia direto.
+  // ------------------------------------------------------------------
+  const [watchingScreens, setWatchingScreens] = useState(() => new Set())
+
+  function watchScreen(peerId) {
+    setWatchingScreens(prev => new Set(prev).add(peerId))
+  }
+  function stopWatchingScreen(peerId) {
+    setWatchingScreens(prev => {
+      const next = new Set(prev)
+      next.delete(peerId)
+      return next
+    })
+  }
+
+  // Se a pessoa parar de compartilhar, tira ela da lista de "assistindo"
+  // pra não sobrar estado morto (e não reabrir sozinho se ela compartilhar de novo).
+  useEffect(() => {
+    setWatchingScreens(prev => {
+      const activeIds = new Set(Object.keys(screenShares || {}))
+      let changed = false
+      const next = new Set(prev)
+      for (const id of prev) {
+        if (!activeIds.has(id)) { next.delete(id); changed = true }
+      }
+      return changed ? next : prev
+    })
+  }, [screenShares])
+
+  function comingSoon() {
+    toast('Em breve!', 'info')
+  }
 
   useEffect(() => {
     const handleFsChange = () => {
@@ -111,7 +123,10 @@ export default function VoiceCallLayout({
     }
   }
 
-  // Lista completa de participantes na chamada (Você + Outros)
+  // Lista completa de participantes na chamada (Você + Outros).
+  // Prioridade de exibição na própria bolha: tela compartilhada > câmera > avatar.
+  // Assim a call fica mais limpa — sem um painel grande separado flutuando,
+  // o que a pessoa está transmitindo já aparece direto no lugar da foto dela.
   const participants = [
     {
       id: 'me',
@@ -119,8 +134,8 @@ export default function VoiceCallLayout({
       avatar: currentUser?.avatar_url || currentUser?.avatar,
       isSpeaking: !!speakingPeers?.me,
       isLocal: true,
-      hasCamera: isCameraOn,
-      stream: webcamStreams?.me,
+      screenStream: screenShares?.me,
+      camStream: isCameraOn ? webcamStreams?.me : null,
     },
     ...voiceUsers.map(([peerId, user]) => ({
       id: peerId,
@@ -128,18 +143,12 @@ export default function VoiceCallLayout({
       avatar: user?.avatar || user?.avatar_url,
       isSpeaking: !!speakingPeers?.[peerId],
       isLocal: false,
-      hasCamera: webcamStreams && (peerId in webcamStreams),
-      stream: webcamStreams?.[peerId],
+      screenStream: screenShares?.[peerId],
+      camStream: webcamStreams && (peerId in webcamStreams) ? webcamStreams[peerId] : null,
     }))
   ]
 
-  // Detecta se há compartilhamento de tela ativo na chamada
-  const activeScreenShares = Object.entries(screenShares)
 
-  function ownerNameFor(peerId) {
-    if (peerId === 'me') return `${currentUser?.name} (Você)`
-    return voiceUsers.find(([id]) => id === peerId)?.[1]?.name || 'Membro'
-  }
 
   return (
     <div className={`voice-call-layout-container${isFullscreen ? ' is-fullscreen' : ''}`} ref={containerRef}>
@@ -158,29 +167,20 @@ export default function VoiceCallLayout({
         </div>
       </header>
 
-      {/* Área Central: Tela Compartilhada (se houver) + Grid de Participantes */}
+      {/* Área Central: Grid de Participantes (tela/câmera aparecem direto na bolha de cada um) */}
       <div className="voice-call-main-content">
-        {activeScreenShares.length > 0 && (
-          <div className="voice-call-screens-container">
-            {activeScreenShares.map(([peerId, stream]) => (
-              <ScreenShareWidget
-                key={peerId}
-                peerId={peerId}
-                stream={stream}
-                ownerName={ownerNameFor(peerId)}
-              />
-            ))}
-          </div>
-        )}
-
         <div className={`voice-call-grid grid-${Math.min(participants.length, 4)}`}>
           {participants.map((p, idx) => {
-            const hasVideo = p.hasCamera && p.stream
+            const isScreenShare = !!p.screenStream
+            // Dono da transmissão sempre vê a própria tela; os outros
+            // só veem depois de clicar em "Assistir" (como no Discord).
+            const isWatchingScreen = p.isLocal || watchingScreens.has(p.id)
+            const showScreenVideo = isScreenShare && isWatchingScreen
+            const activeStream = showScreenVideo ? p.screenStream : p.camStream
+            const hasVideo = !!activeStream
+            const showWatchPrompt = isScreenShare && !isWatchingScreen
             const tileBg = tileColors[idx % tileColors.length]
             const tileStyle = !hasVideo ? { backgroundColor: tileBg } : {}
-
-            // Legenda exibida no segundo card quando o participante está falando
-            const showSubtitle = idx === 1 && p.isSpeaking
 
             return (
               <div
@@ -189,31 +189,66 @@ export default function VoiceCallLayout({
                 style={tileStyle}
               >
                 {hasVideo ? (
-                  <VideoElement stream={p.stream} isLocal={p.isLocal} />
+                  <VideoElement
+                    stream={activeStream}
+                    isLocal={p.isLocal}
+                    mirror={p.isLocal && !showScreenVideo}
+                    isScreenShare={showScreenVideo}
+                  />
                 ) : (
                   <div className="voice-tile-placeholder">
-                    <div className="voice-tile-circle">
-                      <span className="voice-circle-initials">
-                        {p.name.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    {p.avatar ? (
+                      <img className="voice-tile-avatar-img" src={p.avatar} alt={p.name} />
+                    ) : (
+                      <div className="voice-tile-circle">
+                        <span className="voice-circle-initials">
+                          {p.name.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {showSubtitle && (
-                  <div className="voice-tile-subtitle">
-                    Alright Important question for our friendship
-                  </div>
-                )}
-
-                <div className="voice-tile-meta-overlay">
-                  <span className="voice-tile-username">{p.name}</span>
-                  {p.isLocal && isMuted && (
-                    <span className="voice-tile-status-icon muted">
-                      <i className="fa-solid fa-microphone-slash"></i>
+                {/* Alguém está compartilhando tela e você ainda não escolheu assistir */}
+                {showWatchPrompt && (
+                  <div
+                    className="voice-tile-watch-overlay"
+                    onClick={() => watchScreen(p.id)}
+                    role="button"
+                    tabIndex={0}
+                  >
+                    <i className="fa-solid fa-arrow-up-from-bracket voice-tile-watch-icon"></i>
+                    <span className="voice-tile-watch-text"><strong>{p.name}</strong> está compartilhando a tela</span>
+                    <span className="voice-tile-watch-btn">
+                      <i className="fa-solid fa-eye"></i> Assistir
                     </span>
-                  )}
-                </div>
+                  </div>
+                )}
+
+                {/* Assistindo a tela de outra pessoa: badge + botão pra parar */}
+                {showScreenVideo && !p.isLocal && (
+                  <button
+                    className="voice-tile-stop-watch"
+                    title="Parar de assistir"
+                    onClick={() => stopWatchingScreen(p.id)}
+                  >
+                    <i className="fa-solid fa-eye-slash"></i>
+                  </button>
+                )}
+
+                {isScreenShare && isWatchingScreen && (
+                  <span className="voice-tile-status-icon screen-share-badge">
+                    <i className="fa-solid fa-arrow-up-from-bracket"></i> Compartilhando tela
+                  </span>
+                )}
+
+                {p.isLocal && isMuted && (
+                  <span className="voice-tile-status-icon muted">
+                    <i className="fa-solid fa-microphone-slash"></i>
+                  </span>
+                )}
+
+                <span className="voice-tile-name-tag">{p.name}</span>
               </div>
             )
           })}
@@ -222,48 +257,63 @@ export default function VoiceCallLayout({
 
       {/* Barra de Controle de Chamada inferior flutuante */}
       <footer className="voice-call-controls-bar">
-        <div className="vcc-left-spacer"></div>
+        <div className="vcc-pill">
+          {/* Microfone + dropdown */}
+          <div className="vcc-group">
+            <button
+              className={`vcc-sq${isMuted ? ' danger' : ''}`}
+              onClick={onToggleMic}
+              title={isMuted ? 'Ativar Microfone' : 'Mutar Microfone'}
+            >
+              <i className={`fa-solid ${isMuted ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
+            </button>
+            <button className={`vcc-caret${isMuted ? ' danger' : ''}`} onClick={comingSoon} title="Opções de entrada">
+              <i className="fa-solid fa-chevron-down"></i>
+            </button>
+          </div>
 
-        <div className="vcc-center-actions">
-          <button
-            className={`vcc-btn-circle${isCameraOn ? ' active' : ' disabled'}`}
-            onClick={onToggleCamera}
-            title={isCameraOn ? 'Desligar Câmera' : 'Ligar Câmera'}
-          >
-            <i className={`fa-solid ${isCameraOn ? 'fa-video' : 'fa-video-slash'}`}></i>
-          </button>
+          {/* Câmera + dropdown */}
+          <div className="vcc-group">
+            <button
+              className={`vcc-sq${!isCameraOn ? ' muted-off' : ''}`}
+              onClick={onToggleCamera}
+              title={isCameraOn ? 'Desligar Câmera' : 'Ligar Câmera'}
+            >
+              <i className={`fa-solid ${isCameraOn ? 'fa-video' : 'fa-video-slash'}`}></i>
+            </button>
+            <button className="vcc-caret" onClick={comingSoon} title="Opções de vídeo">
+              <i className="fa-solid fa-chevron-down"></i>
+            </button>
+          </div>
+
+          <span className="vcc-sep"></span>
 
           <button
-            className={`vcc-btn-circle${!isMuted ? ' active' : ' disabled'}`}
-            onClick={onToggleMic}
-            title={isMuted ? 'Ativar Microfone' : 'Mutar Microfone'}
-          >
-            <i className={`fa-solid ${isMuted ? 'fa-microphone-slash' : 'fa-microphone'}`}></i>
-          </button>
-
-          <button
-            className={`vcc-btn-circle${isSharingScreen ? ' active' : ''}`}
+            className={`vcc-sq${isSharingScreen ? ' active' : ''}`}
             onClick={onToggleScreenShare}
             title={isSharingScreen ? 'Parar Compartilhamento de Tela' : 'Compartilhar Tela'}
           >
-            <i className="fa-solid fa-desktop"></i>
+            <i className="fa-solid fa-arrow-up-from-bracket"></i>
+          </button>
+
+          <button className="vcc-sq" onClick={comingSoon} title="Ativar aplicativos">
+            <i className="fa-solid fa-grip"></i>
+          </button>
+
+          <button className="vcc-sq" onClick={comingSoon} title="Efeitos">
+            <i className="fa-solid fa-wand-magic-sparkles"></i>
+          </button>
+
+          <button className="vcc-sq" onClick={toggleFullscreen} title={isFullscreen ? 'Sair da Tela Cheia' : 'Tela Cheia'}>
+            <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-ellipsis'}`}></i>
           </button>
 
           <button
-            className="vcc-btn-circle disconnect"
+            className="vcc-hangup"
             onClick={onLeaveVoice}
             title="Sair da Chamada"
           >
             <i className="fa-solid fa-phone-slash"></i>
-          </button>
-        </div>
-
-        <div className="vcc-right-actions">
-          <button className="vcc-small-btn" title="Janela Popout">
-            <i className="fa-solid fa-arrow-up-right-from-square"></i>
-          </button>
-          <button className="vcc-small-btn" onClick={toggleFullscreen} title="Tela Cheia">
-            <i className={`fa-solid ${isFullscreen ? 'fa-compress' : 'fa-expand'}`}></i>
           </button>
         </div>
       </footer>
